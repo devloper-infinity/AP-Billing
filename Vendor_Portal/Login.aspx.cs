@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Configuration;
+using System.Security.Cryptography;
 using System.Linq;
 using System.Web;
 using System.Web.Security;
@@ -160,50 +162,159 @@ namespace Vendor_Portal
                 }
                 else
                 {
-
-                    FormsAuthenticationTicket Authticket = null;
                     DataTable usr = bllLogin.GetUserById(ReturnValue, Filter.SQLInjectionFilter(userID), Filter.SQLInjectionFilter(encPassword));
                     if (usr.Rows.Count <= 0)
                         usr = bllLogin.GetUserById(ReturnValue, Filter.SQLInjectionFilter(userID), Filter.SQLInjectionFilter(pwd));
+                    if (usr.Rows.Count == 0)
+                    {
+                        ShowError("Unable to load the user profile.");
+                        return;
+                    }
 
-                    Authticket = new FormsAuthenticationTicket(
-                                                            1,
-                                                            Convert.ToString(usr.Rows[0]["EmployeeId"]), //UID
-                                                            DateTime.Now,
-                                                            DateTime.Now.AddMinutes(30),
-                                                            chkRemember.Checked, //Remember Me
-                                                            Convert.ToString(usr.Rows[0]["Role"]), //ROLE
-                                                            FormsAuthentication.FormsCookiePath);
-                    string hash = FormsAuthentication.Encrypt(Authticket);
-                    HttpCookie Authcookie = new HttpCookie(FormsAuthentication.FormsCookieName, hash);
-                    if (Authticket.IsPersistent) Authcookie.Expires = Authticket.Expiration;
-                    Response.Cookies.Add(Authcookie);
+                    Session["PendingMfaEmployeeId"] = Convert.ToString(usr.Rows[0]["EmployeeId"]);
+                    Session["PendingMfaRole"] = Convert.ToString(usr.Rows[0]["Role"]);
+                    Session["PendingMfaRemember"] = chkRemember.Checked;
+                    Session["PendingPasswordReset"] = pwd.IndexOf("INFINITY", StringComparison.OrdinalIgnoreCase) >= 0;
 
-                    bool IsTrue = false;
-                    try
+                    if (IsMfaEnabled())
                     {
-                        IsTrue = pwd.ToUpper().Contains("INFINITY");
+                        pnlCredentials.Visible = false;
+                        pnlMfa.Visible = true;
+                        return;
                     }
-                    catch { }
 
-                    if (IsTrue == true)
-                    {
-                        Response.Redirect("~/ResetPassword.aspx");
-                    }
-                    if (returnUrl == null)
-                    {
-                        Response.Redirect("~/Login.aspx", true);
-                    }
-                    else
-                    {
-                        Response.Redirect("~/Login.aspx?ReturnUrl=" + returnUrl, true);
-                    }
+                    CompleteAuthentication();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
+                ShowError("We could not sign you in. Please try again.");
             }
+        }
+
+        protected void btnVerifyMfa_Click(object sender, EventArgs e)
+        {
+            pnlCredentials.Visible = false;
+            pnlMfa.Visible = true;
+
+            string code = Request.Form["mfa_code"];
+            int attempts = Convert.ToInt32(Session["MfaAttempts"] ?? 0);
+            if (attempts >= 5)
+            {
+                ClearPendingAuthentication();
+                pnlCredentials.Visible = true;
+                pnlMfa.Visible = false;
+                ShowError("Too many verification attempts. Please sign in again.");
+                return;
+            }
+
+            Session["MfaAttempts"] = attempts + 1;
+            string mfaSecret = Environment.GetEnvironmentVariable("AP_BILLING_MFA_SECRET") ?? ConfigurationManager.AppSettings["MfaSharedSecret"];
+            if (!ValidateTotp(code, mfaSecret))
+            {
+                ShowError("The authentication code is invalid or has expired.");
+                return;
+            }
+
+            CompleteAuthentication();
+        }
+
+        protected void btnCancelMfa_Click(object sender, EventArgs e)
+        {
+            ClearPendingAuthentication();
+            pnlCredentials.Visible = true;
+            pnlMfa.Visible = false;
+        }
+
+        private bool IsMfaEnabled()
+        {
+            bool enabled;
+            return bool.TryParse(ConfigurationManager.AppSettings["MfaEnabled"], out enabled) && enabled;
+        }
+
+        private void CompleteAuthentication()
+        {
+            string employeeId = Convert.ToString(Session["PendingMfaEmployeeId"]);
+            string role = Convert.ToString(Session["PendingMfaRole"]);
+            bool remember = Convert.ToBoolean(Session["PendingMfaRemember"] ?? false);
+            bool resetPassword = Convert.ToBoolean(Session["PendingPasswordReset"] ?? false);
+            if (string.IsNullOrWhiteSpace(employeeId))
+            {
+                ShowError("Your sign-in request expired. Please sign in again.");
+                pnlCredentials.Visible = true;
+                pnlMfa.Visible = false;
+                return;
+            }
+
+            FormsAuthenticationTicket ticket = new FormsAuthenticationTicket(1, employeeId, DateTime.Now,
+                DateTime.Now.AddMinutes(30), remember, role, FormsAuthentication.FormsCookiePath);
+            HttpCookie authCookie = new HttpCookie(FormsAuthentication.FormsCookieName, FormsAuthentication.Encrypt(ticket));
+            authCookie.HttpOnly = true;
+            authCookie.Secure = Request.IsSecureConnection;
+            if (ticket.IsPersistent) authCookie.Expires = ticket.Expiration;
+            Response.Cookies.Add(authCookie);
+            ClearPendingAuthentication();
+
+            if (resetPassword) Response.Redirect("~/ResetPassword.aspx");
+            Response.Redirect(string.IsNullOrEmpty(returnUrl) ? "~/Login.aspx" : "~/Login.aspx?ReturnUrl=" + Server.UrlEncode(returnUrl), true);
+        }
+
+        private void ClearPendingAuthentication()
+        {
+            Session.Remove("PendingMfaEmployeeId");
+            Session.Remove("PendingMfaRole");
+            Session.Remove("PendingMfaRemember");
+            Session.Remove("PendingPasswordReset");
+            Session.Remove("MfaAttempts");
+        }
+
+        private void ShowError(string message)
+        {
+            dvError.Style["display"] = "block";
+            dvError.Attributes["class"] = "alert alert-danger";
+            dvError.InnerText = message;
+        }
+
+        private static bool ValidateTotp(string code, string base32Secret)
+        {
+            if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(base32Secret)) return false;
+            byte[] key;
+            try { key = DecodeBase32(base32Secret); }
+            catch (FormatException) { return false; }
+            long counter = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+            for (long offset = -1; offset <= 1; offset++)
+                if (GenerateTotp(key, counter + offset) == code.Trim()) return true;
+            return false;
+        }
+
+        private static string GenerateTotp(byte[] key, long counter)
+        {
+            byte[] data = BitConverter.GetBytes(counter);
+            if (BitConverter.IsLittleEndian) Array.Reverse(data);
+            using (HMACSHA1 hmac = new HMACSHA1(key))
+            {
+                byte[] hash = hmac.ComputeHash(data);
+                int offset = hash[hash.Length - 1] & 0x0f;
+                int binary = ((hash[offset] & 0x7f) << 24) | ((hash[offset + 1] & 0xff) << 16) |
+                             ((hash[offset + 2] & 0xff) << 8) | (hash[offset + 3] & 0xff);
+                return (binary % 1000000).ToString("D6");
+            }
+        }
+
+        private static byte[] DecodeBase32(string value)
+        {
+            string input = value.Trim().Replace(" ", "").TrimEnd('=').ToUpperInvariant();
+            byte[] output = new byte[input.Length * 5 / 8];
+            int buffer = 0, bitsLeft = 0, index = 0;
+            foreach (char c in input)
+            {
+                int val = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".IndexOf(c);
+                if (val < 0) throw new FormatException("Invalid Base32 value.");
+                buffer = (buffer << 5) | val;
+                bitsLeft += 5;
+                if (bitsLeft >= 8) { output[index++] = (byte)(buffer >> (bitsLeft - 8)); bitsLeft -= 8; }
+            }
+            return output;
         }
     }
 }

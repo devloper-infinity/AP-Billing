@@ -253,6 +253,7 @@
     <Content Include="dist\css\adminlte.css" />
     <Content Include="dist\css\adminlte.css.map" />
     <Content Include="dist\css\adminlte.min.css" />
+    <Content Include="dist\css\ap-billing-theme.css" />
     <Content Include="dist\css\adminlte.min.css.map" />
     <Content Include="dist\css\alt\adminlte.components.css" />
     <Content Include="dist\css\alt\adminlte.components.css.map" />
@@ -2247,6 +2248,8 @@
     <Content Include="Scripts\Functions\LoanLogicReport.js" />
     <Content Include="Scripts\Functions\LoanLogics.js" />
     <Content Include="Scripts\Functions\Login.js" />
+    <Content Include="Scripts\ap-billing-login.js" />
+    <Content Include="Scripts\ap-billing-theme.js" />
     <Content Include="Scripts\Functions\MagnaReport.js" />
     <Content Include="Scripts\Functions\Pacer.js" />
     <Content Include="Scripts\Functions\RemoteUW670.js" />

@@ -4,7 +4,11 @@
 
 <html>
 <head runat="server">
-    <title></title>
+    <title>Infinity IPS - AP Billing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../plugins/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../dist/css/adminlte.min.css" />
+    <link rel="stylesheet" href="../dist/css/ap-billing-theme.css" />
     <asp:ContentPlaceHolder ID="head" runat="server">
     </asp:ContentPlaceHolder>
 </head>
@@ -16,4 +20,5 @@
         </div>
     </form>
 </body>
+<script src="../Scripts/ap-billing-theme.js"></script>
 </html>

@@ -7,6 +7,7 @@
 <html>
 <head runat="server">
     <title>Infinity IPS - AP Billing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.8/css/line.css">
     <!-- Font Awesome Icons -->
@@ -17,6 +18,7 @@
     <link rel="stylesheet" href="../plugins/datatables-buttons/css/buttons.bootstrap4.min.css">
     <!-- Theme style -->
     <link rel="stylesheet" href="../dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="../dist/css/ap-billing-theme.css">
     <asp:ContentPlaceHolder ID="head" runat="server">
     </asp:ContentPlaceHolder>
     <script>
@@ -63,7 +65,7 @@
             <nav class="main-header navbar navbar-expand-md navbar-light navbar-white">
                 <div class="container">
                     <a href="Dashboard.aspx" class="navbar-brand">
-                        <img src="../images/logo.png" style="height: 50px;" />
+                        <img src="../images/logo.png" class="ap-master-logo" alt="Infinity IPS" />
                         <%--<span class="brand-text font-weight-light">INFINITY IPS</span>--%>
                     </a>
 
@@ -313,6 +315,7 @@
         <!-- AdminLTE App -->
         <script src="../plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
         <script src="../dist/js/adminlte.min.js"></script>
+        <script src="../Scripts/ap-billing-theme.js"></script>
         <!-- AdminLTE for demo purposes -->
 
 
