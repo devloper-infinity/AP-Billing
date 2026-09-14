@@ -8,7 +8,7 @@ var compliance_Conopy_table;
 var Commonreconcile_table;
 var ips_rc_Compliance_html = '';
 var ird_Comp_InvoiceID = 0;
-var ird_CommonInvoiceID = o;
+var ird_CommonInvoiceID = 0;
 var ird_Vendor = "";
 var ird_Month = "";
 var ird_Year = "";

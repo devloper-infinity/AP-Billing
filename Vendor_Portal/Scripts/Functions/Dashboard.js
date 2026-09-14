@@ -67,10 +67,11 @@ function BindDashboardData(Month, Year) {
 
             table_VendorDashbordSummary = $('#table_VendorDashbordSummary').DataTable({
                 dom: 'lBftip',
-                scrollX: true,
                 destroy: true,
                 "paging": true,
-                "autoWidth": true,
+                responsive: false,
+                scrollX: true,
+                "autoWidth": false,
                 select: true,
                 "ordering": false,
                 processing: true,
@@ -83,7 +84,7 @@ function BindDashboardData(Month, Year) {
                 },
 
             });
-
+           
         },
         error: function (error) {
             alert('error; ' + eval(error));
